@@ -23,6 +23,7 @@ using std::cin;
 using std::cout;
 
 struct Enemy {
+    bool active;
     char type;
     u_short x;
     u_short y;
@@ -58,20 +59,39 @@ clock_t gravity(int* playerX, int* playerY, const char map[HEIGHT][WIDTH]) {
 }
 */
 
-void attack(const int playerX, const int playerY, char map[HEIGHT][WIDTH], char* key) {
+void checkHit(int targetY, int targetX, Enemy enemies[], int max_enemies, int& activeCount) {
+    for (int i = 0; i < max_enemies; i++) {
+
+        if (enemies[i].active) {
+
+            if (enemies[i].x == targetX && enemies[i].y == targetY) {
+                enemies[i].active = false; 
+                activeCount--;             
+            }
+        }
+    }
+}
+
+void attack(const int playerX, const int playerY, char map[HEIGHT][WIDTH], char* key, Enemy enemies[], int& activeCount) {
     if(!isAttacking){
-    
+        char top, mid, bot;
         switch (*key) {
         case 'j': 
             *key = ' ';
+            top = map[playerY - 1][playerX - 1];
+            mid = map[playerY][playerX - 1];
+            bot = map[playerY + 1][playerX - 1];
             isAttacking = 1;
             attackEnd = clock() + (CLOCKS_PER_SEC / 2);
             attackPos.X = playerX - 1;
             attackPos.Y = playerY;
-            if (map[playerY][playerX - 1] != '#') {
-                if (map[playerY + 1][playerX] != '#') {
+            if (map[playerY][playerX - 1] != '#' && top != '#' && mid != '#' && top != '=' && mid != '=') {
+                checkHit(playerY - 1, playerX - 1, enemies, maxForWave, activeCount);
+                checkHit(playerY, playerX - 1, enemies, maxForWave, activeCount);
+                if (bot != '#' && bot != '=') {
                     map[playerY - 1][playerX - 1] = '/';
                     map[playerY][playerX - 1] = '|';
+                    checkHit(playerY + 1, playerX - 1, enemies, maxForWave, activeCount);
                     map[playerY + 1][playerX - 1] = '\\';
                 }
                 else {
@@ -82,38 +102,56 @@ void attack(const int playerX, const int playerY, char map[HEIGHT][WIDTH], char*
             break;
         case 'i':
             *key = ' ';
+            top = map[playerY - 1][playerX - 1];
+            mid = map[playerY - 1][playerX];
+            bot = map[playerY - 1][playerX + 1];
             isAttacking = 1;
             attackEnd = clock() + (CLOCKS_PER_SEC / 2);
             attackPos.X = playerX;
             attackPos.Y = playerY - 1;
-            if (map[playerY - 1][playerX] != '#' && map[playerY - 1][playerX] != '=' && map[playerY - 1][playerX - 1] != '=' && map[playerY - 1][playerX + 1] != '=') {
+            if (top != '#' && mid != '#' && bot != '#' && top != '=' && mid != '=' && bot != '=') {
+                checkHit(playerY - 1, playerX - 1, enemies, maxForWave, activeCount);
                     map[playerY - 1][playerX - 1] = '\\';
+                    checkHit(playerY - 1, playerX, enemies, maxForWave, activeCount);
                     map[playerY - 1][playerX] = '-';
+                    checkHit(playerY - 1, playerX + 1, enemies, maxForWave, activeCount);
                     map[playerY - 1][playerX + 1] = '/';
             }
             break;
         case 'k':
             *key = ' ';
+            top = map[playerY + 1][playerX - 1];
+            mid = map[playerY + 1][playerX];
+            bot = map[playerY + 1][playerX + 1];
             isAttacking = 1;
             attackEnd = clock() + (CLOCKS_PER_SEC / 2);
             attackPos.X = playerX;
             attackPos.Y = playerY + 1;
-            if (map[playerY + 1][playerX] != '#') {
+            if (top != '#' && mid != '#' && bot != '#' && top != '=' && mid != '=' && bot != '=') {
+                checkHit(playerY + 1, playerX - 1, enemies, maxForWave, activeCount);
                     map[playerY + 1][playerX - 1] = '\\';
+                    checkHit(playerY + 1, playerX, enemies, maxForWave, activeCount);
                     map[playerY + 1][playerX] = '_';
+                    checkHit(playerY + 1, playerX + 1, enemies, maxForWave, activeCount);
                     map[playerY + 1][playerX + 1] = '/';
             }
             break;
         case 'l':
             *key = ' ';
+            top = map[playerY - 1][playerX + 1];
+            mid = map[playerY][playerX + 1];
+            bot = map[playerY + 1][playerX + 1];
             isAttacking = 1;
             attackEnd = clock() + (CLOCKS_PER_SEC / 2);
             attackPos.X = playerX + 1;
             attackPos.Y = playerY;
-            if (map[playerY][playerX - 1] != '#') {
-                if (map[playerY + 1][playerX] != '#') {
+            if (map[playerY][playerX + 1] != '#' && top != '#' && mid != '#' && top != '=' && mid != '=') {
+                checkHit(playerY - 1, playerX + 1, enemies, maxForWave, activeCount);
+                checkHit(playerY, playerX + 1, enemies, maxForWave, activeCount);
+                if (bot != '#' && bot != '=') {
                     map[playerY - 1][playerX + 1] = '\\';
                     map[playerY][playerX + 1] = '|';
+                    checkHit(playerY + 1, playerX + 1, enemies, maxForWave, activeCount);
                     map[playerY + 1][playerX + 1] = '/';
                 }
                 else {
@@ -263,6 +301,85 @@ void printMap(char map[HEIGHT][WIDTH]) {
 
 }
 
+void spawnEnemies(Enemy enemies[], int max_size,int* currentCount, char map[HEIGHT][WIDTH], COORD playerPos) {
+    int enemiesToSpawn = (rand() % 4) + 2;
+
+    int spawnedSoFar = 0;
+
+    for (int i = 0; i < maxForWave; i++) {
+        if (spawnedSoFar >= enemiesToSpawn) break;
+
+        if (!enemies[i].active) {
+            bool validPosition = false;
+            int randX, randY;
+
+            while (!validPosition) {
+                randX = (rand() % (WIDTH - 2)) + 1;
+                randY = (rand() % (HEIGHT - 2)) + 1;
+
+                if (map[randY][randX] == ' ' && (randX != playerPos.X || randY != playerPos.Y)) {
+                    validPosition = true;
+                }
+            }
+
+            enemies[i].active = true;
+            enemies[i].type = 'E';
+            enemies[i].x = randX;
+            enemies[i].y = randY;
+            enemies[i].moveTimer = clock();
+
+            // Place on map
+            map[randY][randX] = enemies[i].type;
+
+            spawnedSoFar++;
+            currentCount++;
+        }
+    }
+}
+
+void moveEnemies(Enemy enemies[], int max_size, char map[HEIGHT][WIDTH], COORD playerPos) {
+    clock_t now = clock();
+
+    for (int i = 0; i < max_size; i++) {
+
+        if (!enemies[i].active) continue;
+
+        if (now > enemies[i].moveTimer) {
+
+            map[enemies[i].y][enemies[i].x] = ' ';
+
+            int nextX = enemies[i].x;
+            int nextY = enemies[i].y;
+
+            if (map[enemies[i].y + 1][enemies[i].x] != '#' && map[enemies[i].y + 1][enemies[i].x] != '=') {
+                nextY++; 
+            }
+
+            else {
+                if (enemies[i].x < playerPos.X) {
+                    
+                    if (map[enemies[i].y][enemies[i].x + 1] != '#' && map[enemies[i].y][enemies[i].x + 1] != '=') {
+                        nextX++;
+                    }
+                }
+                else if (enemies[i].x > playerPos.X) {
+                    
+                    if (map[enemies[i].y][enemies[i].x - 1] != '#' && map[enemies[i].y][enemies[i].x - 1] != '=') {
+                        nextX--;
+                    }
+                }
+            }
+
+            enemies[i].x = nextX;
+            enemies[i].y = nextY;
+            if (nextX == playerPos.X && nextY == playerPos.Y) health--;
+            map[enemies[i].y][enemies[i].x] = enemies[i].type;
+
+            enemies[i].moveTimer = clock() + (CLOCKS_PER_SEC / 5); 
+        }
+    }
+}
+
 int main()
 {
     HANDLE hStdOut = NULL;
@@ -284,6 +401,8 @@ int main()
     clock_t current;
     clock_t move = clock() + (CLOCKS_PER_SEC / 10);
     Enemy* enemies = new Enemy[maxForWave];
+    int activeEnemyCount = 0;
+    for (int i = 0; i < maxForWave; i++) enemies[i].active = false;
 
     printTopRow();
     printMap(map);
@@ -291,13 +410,20 @@ int main()
 
     while (running) {
         current = clock();
+        if (health == 0) break;
+        if (activeEnemyCount == 0) {
+            spawnEnemies(enemies, max_wave, &activeEnemyCount, map, newPlayer);
+        }
 
         if (_kbhit()) {
             keyPress = _getch();
         }
+
+        moveEnemies(enemies, maxForWave, map, newPlayer);
+
         if (move < current) {
             move = movePlayer(oldPlayer, &newPlayer, map, &keyPress);
-            attack(oldPlayer.X, oldPlayer.Y, map, &keyPress);
+            attack(oldPlayer.X, oldPlayer.Y, map, &keyPress, enemies, activeEnemyCount);
             attackCleanup(map);
         }
        
@@ -310,6 +436,14 @@ int main()
 
         updateMap(map, &oldPlayer, newPlayer);
     }
+
+    delete[] enemies;
+    system("CLS");
+    goToXY(0, 0);
+
+    cout << "################################" << std::endl;
+    cout << "#          GAME OVER!          #" << std::endl;
+    cout << "################################" << std::endl;
 
     return 0;
 }
