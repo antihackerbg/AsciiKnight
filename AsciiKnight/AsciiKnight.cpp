@@ -27,6 +27,73 @@ const int WIDTH = 120;
 const u_short MAX_HEALTH = 5;
 bool running = 1;
 u_short health = 1;
+int jumpCount = 0;
+short velocityY = 0;
+short velocityX = 0;
+
+/*
+clock_t gravity(int* playerX, int* playerY, const char map[HEIGHT][WIDTH]) {
+    if (map[*playerY - 1][*playerX] != '#' && map[*playerY - 1][*playerX] !='=' && velocityY < 0) {
+        *playerY -= 1;
+        velocityY++;
+    }
+    else if (map[*playerY + 1][*playerX] != '#' && map[*playerY + 1][*playerX] != '=') {
+        *playerY += 1;
+    }
+    return (clock() + (CLOCKS_PER_SEC / 10));
+}
+*/
+
+clock_t movePlayer(int* playerX, int* playerY, const char map[HEIGHT][WIDTH]) {
+    
+    if (map[(*playerY + 1)][*playerX] == '#' || map[(*playerY + 1)][*playerX] == '=') jumpCount = 0;
+
+    int nextX = *playerX, nextY = *playerY;
+
+    if (_kbhit()) {
+        char key = _getch();
+        
+
+        if (key == 'w') if (jumpCount < 2) {
+            jumpCount++;
+            if(map[nextY - 1][nextX] != '=' && map[nextY - 1][nextX] != '#' && map[nextY - 2][nextX] != '=' && map[nextY - 2][nextX] != '#'){
+                velocityY = -3;
+            }
+            else if (map[nextY - 1][nextX] != '=' && map[nextY - 1][nextX] != '#') {
+                velocityY = -3;
+            }
+        };
+        if (key == 'a') velocityX = -2;
+        if (key == 'd') velocityX = 2;
+
+        
+    }
+
+    if (map[*playerY - 1][*playerX] != '#' && map[*playerY - 1][*playerX] != '=' && velocityY < 0) {
+        nextY = *playerY - 1;
+        velocityY++;
+    }
+    else if (map[*playerY + 1][*playerX] != '#' && map[*playerY + 1][*playerX] != '=') {
+        nextY = *playerY + 1;
+    }
+
+    if (map[*playerY][*playerX - 1] != '#' && map[*playerY][*playerX - 1] != '=' && velocityX < 0) {
+        nextX = *playerX - 1;
+        velocityX++;
+    }
+    else if (map[*playerY][*playerX + 1] != '#' && map[*playerY][*playerX + 1] != '=' && velocityX > 0) {
+        nextX = *playerX + 1;
+        velocityX--;
+    }
+
+
+    if (map[nextY][nextX] != '#') {
+        *playerX = nextX;
+        *playerY = nextY;
+    }
+
+    return (clock() + (CLOCKS_PER_SEC / 10));
+}
 
 void printTopRow() {
     char healthBar[MAX_HEALTH + 3];
@@ -44,10 +111,10 @@ void printTopRow() {
 }
 
 void sleep(int seconds) {
-    time_t current = time(NULL);
-    time_t finished = current + seconds;
-    while (current < finished) {
-        current = time(NULL);
+    clock_t start = clock();
+    clock_t length = seconds * CLOCKS_PER_SEC;
+    while (clock() - start < length) {
+
     }
 }
 
@@ -85,13 +152,38 @@ void printMap(char map[HEIGHT][WIDTH]) {
 
 int main()
 {
+    HANDLE hStdOut = NULL;
+    CONSOLE_CURSOR_INFO curInfo;
+
+    //Code to make cursor invisible
+    hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    GetConsoleCursorInfo(hStdOut, &curInfo);
+    curInfo.bVisible = FALSE;
+    SetConsoleCursorInfo(hStdOut, &curInfo);
+
+
     char map[HEIGHT][WIDTH];
     int playerX = 40;
-    int playerY = 10;
+    int playerY = 17;
+    //double current = (double)time(NULL);
+    //double activateGravity = current + 0.2;
+
+    clock_t current;
+    clock_t move = clock() + (CLOCKS_PER_SEC / 10);
+
+    printTopRow();
+    printMap(map);
 
 
     while (running) {
-        sleep(1);
+        current = clock();
+
+        //movement(&playerX, &playerY, map);
+
+        if (move < current) {
+           move = movePlayer(&playerX, &playerY, map);
+        }
+       
         updateMap(map, playerX, playerY);
 
         goToXY(0, 0);
