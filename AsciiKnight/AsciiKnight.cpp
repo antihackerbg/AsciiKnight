@@ -22,14 +22,28 @@
 using std::cin;
 using std::cout;
 
+struct Enemy {
+    char type;
+    u_short x;
+    u_short y;
+    clock_t moveTimer; 
+};
+
+const u_short max_wave = 10;
 const int HEIGHT = 20;
 const int WIDTH = 120;
 const u_short MAX_HEALTH = 5;
+
+u_short wave = 1;
 bool running = 1;
-u_short health = 1;
+u_short health = 5;
 int jumpCount = 0;
 short velocityY = 0;
 short velocityX = 0;
+u_short maxForWave = 4;
+bool isAttacking = false;
+clock_t attackEnd = 0;
+COORD attackPos = { 0, 0 };
 
 /*
 clock_t gravity(int* playerX, int* playerY, const char map[HEIGHT][WIDTH]) {
@@ -44,52 +58,142 @@ clock_t gravity(int* playerX, int* playerY, const char map[HEIGHT][WIDTH]) {
 }
 */
 
-clock_t movePlayer(int* playerX, int* playerY, const char map[HEIGHT][WIDTH]) {
+void attack(const int playerX, const int playerY, char map[HEIGHT][WIDTH], char* key) {
+    if(!isAttacking){
     
-    if (map[(*playerY + 1)][*playerX] == '#' || map[(*playerY + 1)][*playerX] == '=') jumpCount = 0;
+        switch (*key) {
+        case 'j': 
+            *key = ' ';
+            isAttacking = 1;
+            attackEnd = clock() + (CLOCKS_PER_SEC / 2);
+            attackPos.X = playerX - 1;
+            attackPos.Y = playerY;
+            if (map[playerY][playerX - 1] != '#') {
+                if (map[playerY + 1][playerX] != '#') {
+                    map[playerY - 1][playerX - 1] = '/';
+                    map[playerY][playerX - 1] = '|';
+                    map[playerY + 1][playerX - 1] = '\\';
+                }
+                else {
+                    map[playerY - 1][playerX - 1] = '/';
+                    map[playerY][playerX - 1] = '|';
+                }
+            }
+            break;
+        case 'i':
+            *key = ' ';
+            isAttacking = 1;
+            attackEnd = clock() + (CLOCKS_PER_SEC / 2);
+            attackPos.X = playerX;
+            attackPos.Y = playerY - 1;
+            if (map[playerY - 1][playerX] != '#' && map[playerY - 1][playerX] != '=' && map[playerY - 1][playerX - 1] != '=' && map[playerY - 1][playerX + 1] != '=') {
+                    map[playerY - 1][playerX - 1] = '\\';
+                    map[playerY - 1][playerX] = '-';
+                    map[playerY - 1][playerX + 1] = '/';
+            }
+            break;
+        case 'k':
+            *key = ' ';
+            isAttacking = 1;
+            attackEnd = clock() + (CLOCKS_PER_SEC / 2);
+            attackPos.X = playerX;
+            attackPos.Y = playerY + 1;
+            if (map[playerY + 1][playerX] != '#') {
+                    map[playerY + 1][playerX - 1] = '\\';
+                    map[playerY + 1][playerX] = '_';
+                    map[playerY + 1][playerX + 1] = '/';
+            }
+            break;
+        case 'l':
+            *key = ' ';
+            isAttacking = 1;
+            attackEnd = clock() + (CLOCKS_PER_SEC / 2);
+            attackPos.X = playerX + 1;
+            attackPos.Y = playerY;
+            if (map[playerY][playerX - 1] != '#') {
+                if (map[playerY + 1][playerX] != '#') {
+                    map[playerY - 1][playerX + 1] = '\\';
+                    map[playerY][playerX + 1] = '|';
+                    map[playerY + 1][playerX + 1] = '/';
+                }
+                else {
+                    map[playerY - 1][playerX + 1] = '\\';
+                    map[playerY][playerX + 1] = '|';
+                }
+            }
+            break;
+        }
+    }
+}
 
-    int nextX = *playerX, nextY = *playerY;
+void attackCleanup(char map[HEIGHT][WIDTH]) {
+    if (isAttacking) {
+        if (clock() > attackEnd) {
+            if (map[attackPos.Y][attackPos.X] == '|' || map[attackPos.Y][attackPos.X] == '-' || map[attackPos.Y][attackPos.X] == '_') {
+                map[attackPos.Y][attackPos.X] = ' ';
+            }
+            if (map[attackPos.Y - 1][attackPos.X] == '/' || map[attackPos.Y - 1][attackPos.X] == '\\') {
+                map[attackPos.Y - 1][attackPos.X] = ' ';
+            }
+            if (map[attackPos.Y + 1][attackPos.X] == '\\' || map[attackPos.Y + 1][attackPos.X] == '/') {
+                map[attackPos.Y + 1][attackPos.X] = ' ';
+            }
+            if (map[attackPos.Y][attackPos.X + 1] == '\\' || map[attackPos.Y][attackPos.X + 1] == '/') {
+                map[attackPos.Y][attackPos.X + 1] = ' ';
+            }
+            if (map[attackPos.Y][attackPos.X - 1] == '\\' || map[attackPos.Y][attackPos.X - 1] == '/') {
+                map[attackPos.Y][attackPos.X - 1] = ' ';
+            }
+            isAttacking = false;
+        }
+    }
+}
 
-    if (_kbhit()) {
-        char key = _getch();
-        
+clock_t movePlayer(const COORD currentPlayer, COORD* newPlayer, const char map[HEIGHT][WIDTH], char* key) {
+    
+    if (map[(currentPlayer.Y + 1)][currentPlayer.X] == '#' || map[(currentPlayer.Y + 1)][currentPlayer.X] == '=') jumpCount = 0;
 
-        if (key == 'w') if (jumpCount < 2) {
+    int nextX = currentPlayer.X, nextY = currentPlayer.Y;
+        if (*key == 'w') if (jumpCount < 2) {
+            *key = ' ';
             jumpCount++;
-            if(map[nextY - 1][nextX] != '=' && map[nextY - 1][nextX] != '#' && map[nextY - 2][nextX] != '=' && map[nextY - 2][nextX] != '#'){
+            if(map[nextY - 2][nextX] != '=' && map[nextY - 2][nextX] != '#'){
                 velocityY = -3;
             }
             else if (map[nextY - 1][nextX] != '=' && map[nextY - 1][nextX] != '#') {
                 velocityY = -3;
             }
         };
-        if (key == 'a') velocityX = -2;
-        if (key == 'd') velocityX = 2;
+        if (*key == 'a') {
+            velocityX = -2;
+            *key = ' ';
+        }
+        if (*key == 'd') {
+            velocityX = 2;
+            *key = ' ';
+        }
 
-        
-    }
-
-    if (map[*playerY - 1][*playerX] != '#' && map[*playerY - 1][*playerX] != '=' && velocityY < 0) {
-        nextY = *playerY - 1;
+    if (map[currentPlayer.Y - 1][currentPlayer.X] != '#' && map[currentPlayer.Y - 1][currentPlayer.X] != '=' && velocityY < 0) {
+        nextY = currentPlayer.Y - 1;
         velocityY++;
     }
-    else if (map[*playerY + 1][*playerX] != '#' && map[*playerY + 1][*playerX] != '=') {
-        nextY = *playerY + 1;
+    else if (map[currentPlayer.Y + 1][currentPlayer.X] != '#' && map[currentPlayer.Y + 1][currentPlayer.X] != '=') {
+        nextY = currentPlayer.Y + 1;
     }
 
-    if (map[*playerY][*playerX - 1] != '#' && map[*playerY][*playerX - 1] != '=' && velocityX < 0) {
-        nextX = *playerX - 1;
+    if (map[currentPlayer.Y][currentPlayer.X - 1] != '#' && map[currentPlayer.Y][currentPlayer.X - 1] != '=' && velocityX < 0) {
+        nextX = currentPlayer.X - 1;
         velocityX++;
     }
-    else if (map[*playerY][*playerX + 1] != '#' && map[*playerY][*playerX + 1] != '=' && velocityX > 0) {
-        nextX = *playerX + 1;
+    else if (map[currentPlayer.Y][currentPlayer.X + 1] != '#' && map[currentPlayer.Y][currentPlayer.X + 1] != '=' && velocityX > 0) {
+        nextX = currentPlayer.X + 1;
         velocityX--;
     }
 
 
     if (map[nextY][nextX] != '#') {
-        *playerX = nextX;
-        *playerY = nextY;
+        (*newPlayer).X = nextX;
+        (*newPlayer).Y = nextY;
     }
 
     return (clock() + (CLOCKS_PER_SEC / 10));
@@ -125,18 +229,27 @@ void goToXY(int x, int y) {
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 
-void updateMap(char map[HEIGHT][WIDTH], int playerX, int playerY) {
+void initMap(char map[HEIGHT][WIDTH], COORD playerStart) {
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
             if (i == 0 || i == (HEIGHT - 1) || j == 0 || j == (WIDTH - 1)) {
                 map[i][j] = '#';
+            }
+            else if (i == 16 && j > 10 && j < 30) {
+                map[i][j] = '=';
             }
             else {
                 map[i][j] = ' ';
             }
         }
     }
-    map[playerY][playerX] = '@';
+    map[playerStart.Y][playerStart.X] = '@';
+}
+
+void updateMap(char map[HEIGHT][WIDTH], COORD* oldCoords, COORD newCoords) {
+    map[(*oldCoords).Y][(*oldCoords).X] = ' ';
+    map[newCoords.Y][newCoords.X] = '@';
+    *oldCoords = newCoords;
 }
 
 void printMap(char map[HEIGHT][WIDTH]) {
@@ -161,35 +274,41 @@ int main()
     curInfo.bVisible = FALSE;
     SetConsoleCursorInfo(hStdOut, &curInfo);
 
-
+    srand(time(NULL));
     char map[HEIGHT][WIDTH];
-    int playerX = 40;
-    int playerY = 17;
-    //double current = (double)time(NULL);
-    //double activateGravity = current + 0.2;
-
+    COORD oldPlayer;
+    oldPlayer.X = 40;
+    oldPlayer.Y = 17;
+    char keyPress = ' ';
+    COORD newPlayer = oldPlayer;
     clock_t current;
     clock_t move = clock() + (CLOCKS_PER_SEC / 10);
+    Enemy* enemies = new Enemy[maxForWave];
 
     printTopRow();
     printMap(map);
-
+    initMap(map, oldPlayer);
 
     while (running) {
         current = clock();
 
-        //movement(&playerX, &playerY, map);
-
+        if (_kbhit()) {
+            keyPress = _getch();
+        }
         if (move < current) {
-           move = movePlayer(&playerX, &playerY, map);
+            move = movePlayer(oldPlayer, &newPlayer, map, &keyPress);
+            attack(oldPlayer.X, oldPlayer.Y, map, &keyPress);
+            attackCleanup(map);
         }
        
-        updateMap(map, playerX, playerY);
+        
 
         goToXY(0, 0);
 
         printTopRow();
         printMap(map);
+
+        updateMap(map, &oldPlayer, newPlayer);
     }
 
     return 0;
